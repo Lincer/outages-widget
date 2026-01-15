@@ -4,14 +4,14 @@
 const fm = FileManager.local();
 
 // Get the subqueue number from widget parameter
-const subqueueNumber = args.widgetParameter ?? "3.1";
+const subqueueNumber = args.widgetParameter ?? '3.1';
 
 // Auto-update configuration
-const scriptName = "Outages";
-const repoUser = "USER_NAME"; // Replace with your GitHub username
-const repoName = "REPO_NAME"; // Replace with your repository name
+const scriptName = 'Outages';
+const repoUser = 'Lincer';
+const repoName = 'outages-widget';
 const rawUrl = `https://raw.githubusercontent.com/${repoUser}/${repoName}/main/${scriptName}.js`;
-const currentVersion = "1.0.0"; 
+const currentVersion = "1.0.0";
 
 // Check for updates
 async function checkForUpdates() {
@@ -31,7 +31,7 @@ async function checkForUpdates() {
     const updatedCode = await req.loadString();
     
     // Simple version check: look for currentVersion in the remote file
-    const versionMatch = updatedCode.match(/const currentVersion = "([^"]+)"/);
+    const versionMatch = updatedCode.match(/const currentVersion = '([^']+)'/);
     
     fm.writeString(lastCheckPath, today);
 
@@ -41,7 +41,7 @@ async function checkForUpdates() {
       return true;
     }
   } catch (e) {
-    console.log("Update check failed: " + e.message);
+    console.log('Update check failed: ' + e.message);
   }
   return false;
 }
