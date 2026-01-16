@@ -13,7 +13,7 @@ const scriptName = 'Outages';
 const repoUser = 'Lincer';
 const repoName = 'outages-widget';
 const rawUrl = `https://raw.githubusercontent.com/${repoUser}/${repoName}/main/${scriptName}.js`;
-const currentVersion = "1.0.1";
+const currentVersion = "0.9";
 
 // Check for updates
 async function checkForUpdates() {
@@ -115,7 +115,7 @@ img.imageSize = new Size(24, 24)
 headerRow.addSpacer(5);
 
 // header text
-const headerText = headerRow.addText(`Черга ${subqueueNumber}:`);
+const headerText = headerRow.addText(`1Черга ${subqueueNumber}:`);
 headerText.textColor = new Color("#e4e3df");
 headerText.font = Font.boldSystemFont(14);
 headerText.leftAlignText();
