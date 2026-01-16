@@ -5,28 +5,18 @@ const fm =  FileManager.iCloud().isFileStoredIniCloud(module.filename)
     ? FileManager.iCloud()
     : FileManager.local();
 
-// Get the subqueue number from widget parameter, default is 1.1
+// Get the subqueue number from the widget parameter, default is 1.1
 const subqueueNumber = args.widgetParameter ?? '1.1';
 
 // Auto-update configuration
 const scriptName = 'Outages';
-const repoUser = 'Lincer';
-const repoName = 'outages-widget';
-const rawUrl = `https://raw.githubusercontent.com/${repoUser}/${repoName}/main/${scriptName}.js`;
+const rawUrl = `https://raw.githubusercontent.com/Lincer/outages-widget/main/${scriptName}.js`;
 const currentVersion = "1.0";
 
 // Check for updates
 async function checkForUpdates() {
   const lastCheckPath = fm.joinPath(fm.documentsDirectory(), `last_update_check_${scriptName}.json`);
   const today = new Date().toLocaleDateString();
-
-  // Check only once a day
-  // if (fm.fileExists(lastCheckPath)) {
-  //   const lastCheck = fm.readString(lastCheckPath);
-  //   if (lastCheck === today) {
-  //     return false;
-  //   }
-  // }
 
   try {
     const req = new Request(rawUrl);
