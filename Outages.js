@@ -1,7 +1,9 @@
 // Variables used by Scriptable.
 // These must be at the very top of the file. Do not edit.
 // icon-color: blue; icon-glyph: bolt;
-const fm = FileManager.local();
+const fm =  FileManager.iCloud().isFileStoredIniCloud(module.filename)
+    ? FileManager.iCloud()
+    : FileManager.local();
 
 // Get the subqueue number from widget parameter, default is 1.1
 const subqueueNumber = args.widgetParameter ?? '1.1';
@@ -29,15 +31,25 @@ async function checkForUpdates() {
   try {
     const req = new Request(rawUrl);
     const updatedCode = await req.loadString();
-    
+
     // Simple version check: look for currentVersion in the remote file
-    const versionMatch = updatedCode.match(/const currentVersion = '([^']+)'/);
-    
+    const versionMatch = updatedCode.match(/const currentVersion = "([^"]+)"/);
+
+    if (fm.isFileStoredIniCloud(lastCheckPath)) {
+      await fm.downloadFileFromiCloud(lastCheckPath);
+    }
     fm.writeString(lastCheckPath, today);
 
     if (versionMatch && versionMatch[1] !== currentVersion) {
       const scriptPath = fm.joinPath(fm.documentsDirectory(), `${scriptName}.js`);
+
+      if (fm.isFileStoredIniCloud(scriptPath)) {
+        await fm.downloadFileFromiCloud(scriptPath);
+      }
+
       fm.writeString(scriptPath, updatedCode);
+
+      Script.complete();
       return true;
     }
   } catch (e) {
@@ -61,7 +73,7 @@ try {
   if (outagesString && outagesString[1]) {
     timeStrings = [...outagesString[1].matchAll(/(\d{2}:\d{2})\sдо\s(\d{2}:\d{2})/g)]
         .map(m => `${m[1]} - ${m[2]}`);
-    
+
     // save to cache
     fm.writeString(cachePath, JSON.stringify(timeStrings));
   } else {
@@ -103,7 +115,7 @@ img.imageSize = new Size(24, 24)
 headerRow.addSpacer(5);
 
 // header text
-const headerText = headerRow.addText(`Відключення для черги ${subqueueNumber}`);
+const headerText = headerRow.addText(`Черга ${subqueueNumber}:`);
 headerText.textColor = new Color("#e4e3df");
 headerText.font = Font.boldSystemFont(14);
 headerText.leftAlignText();
@@ -114,7 +126,7 @@ widget.addSpacer(10);
 timeStrings.forEach(time => {
   const nameText = widget.addText(time);
   nameText.textColor = new Color("#e4e3df");
-  nameText.font = Font.boldSystemFont(16);
+  nameText.font = Font.regularSystemFont(16);
   nameText.leftAlignText();
 
   widget.addSpacer(10);
