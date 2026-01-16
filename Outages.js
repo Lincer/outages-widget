@@ -13,7 +13,7 @@ const scriptName = 'Outages';
 const repoUser = 'Lincer';
 const repoName = 'outages-widget';
 const rawUrl = `https://raw.githubusercontent.com/${repoUser}/${repoName}/main/${scriptName}.js`;
-const currentVersion = "1.0.1";
+const currentVersion = "1.0";
 
 // Check for updates
 async function checkForUpdates() {
