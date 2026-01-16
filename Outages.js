@@ -13,7 +13,7 @@ const scriptName = 'Outages';
 const repoUser = 'Lincer';
 const repoName = 'outages-widget';
 const rawUrl = `https://raw.githubusercontent.com/${repoUser}/${repoName}/main/${scriptName}.js`;
-const currentVersion = "1.0.0";
+const currentVersion = "1.0.1";
 
 // Check for updates
 async function checkForUpdates() {
@@ -21,12 +21,12 @@ async function checkForUpdates() {
   const today = new Date().toLocaleDateString();
 
   // Check only once a day
-  if (fm.fileExists(lastCheckPath)) {
-    const lastCheck = fm.readString(lastCheckPath);
-    if (lastCheck === today) {
-      return false;
-    }
-  }
+  // if (fm.fileExists(lastCheckPath)) {
+  //   const lastCheck = fm.readString(lastCheckPath);
+  //   if (lastCheck === today) {
+  //     return false;
+  //   }
+  // }
 
   try {
     const req = new Request(rawUrl);
