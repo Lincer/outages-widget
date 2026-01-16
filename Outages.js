@@ -3,8 +3,8 @@
 // icon-color: blue; icon-glyph: bolt;
 const fm = FileManager.local();
 
-// Get the subqueue number from widget parameter
-const subqueueNumber = args.widgetParameter ?? '3.1';
+// Get the subqueue number from widget parameter, default is 1.1
+const subqueueNumber = args.widgetParameter ?? '1.1';
 
 // Auto-update configuration
 const scriptName = 'Outages';
