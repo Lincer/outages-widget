@@ -7,7 +7,7 @@ const fm =  FileManager.iCloud().isFileStoredIniCloud(module.filename)
 
 // Get the subqueue number from the widget parameter, default is 1.1
 const subqueueParam = args.widgetParameter ?? '1.1';
-const isInversed = subqueueParam.endsWith('і');
+const isInversed = subqueueParam.endsWith('є');
 const subqueueNumber = isInversed ? subqueueParam.slice(0, -1) : subqueueParam;
 
 // Auto-update configuration
