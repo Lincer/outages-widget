@@ -17,21 +17,12 @@ const currentVersion = "1.1";
 
 // Check for updates
 async function checkForUpdates() {
-  const lastCheckPath = fm.joinPath(fm.documentsDirectory(), `last_update_check_${scriptName}.json`);
-  const today = new Date().toLocaleDateString();
-
   try {
     const req = new Request(rawUrl);
     const updatedCode = await req.loadString();
 
     // Simple version check: look for currentVersion in the remote file
     const versionMatch = updatedCode.match(/const currentVersion = "([^"]+)"/);
-
-    if (fm.isFileStoredIniCloud(lastCheckPath)) {
-      await fm.downloadFileFromiCloud(lastCheckPath);
-    }
-    fm.writeString(lastCheckPath, today);
-
     if (versionMatch && versionMatch[1] !== currentVersion) {
       const scriptPath = fm.joinPath(fm.documentsDirectory(), `${scriptName}.js`);
 
