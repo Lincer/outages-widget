@@ -6,12 +6,14 @@ const fm =  FileManager.iCloud().isFileStoredIniCloud(module.filename)
     : FileManager.local();
 
 // Get the subqueue number from the widget parameter, default is 1.1
-const subqueueNumber = args.widgetParameter ?? '1.1';
+const subqueueParam = args.widgetParameter ?? '1.1';
+const isInversed = subqueueParam.endsWith('і');
+const subqueueNumber = isInversed ? subqueueParam.slice(0, -1) : subqueueParam;
 
 // Auto-update configuration
 const scriptName = 'Outages';
 const rawUrl = `https://raw.githubusercontent.com/Lincer/outages-widget/main/${scriptName}.js`;
-const currentVersion = "1.0";
+const currentVersion = "1.1";
 
 // Check for updates
 async function checkForUpdates() {
@@ -77,6 +79,25 @@ try {
   }
 }
 
+// Invert time slots if requested
+if (isInversed && timeStrings.length > 0) {
+  let inverted = [];
+  let lastEnd = "00:00";
+
+  timeStrings.forEach(slot => {
+    const [start, end] = slot.split(" - ");
+    if (start !== lastEnd) {
+      inverted.push(`${lastEnd} - ${start}`);
+    }
+    lastEnd = end;
+  });
+
+  if (lastEnd !== "24:00") {
+    inverted.push(`${lastEnd} - 24:00`);
+  }
+  timeStrings = inverted;
+}
+
 // Widget layout
 // gradient background for the widget
 function createGradientBackground(widget, colors) {
@@ -101,6 +122,7 @@ const symbol = SFSymbol.named("bolt.fill")
 const image = symbol.image
 const img = headerRow.addImage(image)
 img.imageSize = new Size(24, 24)
+img.tintColor = isInversed ? Color.green() : Color.red();
 
 headerRow.addSpacer(5);
 
