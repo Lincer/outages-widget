@@ -13,7 +13,7 @@ const subqueueNumber = isInversed ? subqueueParam.slice(0, -1) : subqueueParam;
 // Auto-update configuration
 const scriptName = 'Outages';
 const rawUrl = `https://raw.githubusercontent.com/Lincer/outages-widget/main/${scriptName}.js`;
-const currentVersion = "1.1";
+const currentVersion = "1.2";
 
 // Check for updates
 async function checkForUpdates() {
@@ -52,7 +52,7 @@ let timeStrings = [];
 try {
   const req = new Request(url)
   const html = await req.loadString()
-  const outagesString = html.match(new RegExp(`підчерга\\s${subqueueNumber}\\s–\\s([^;\\n]+)`));
+  const outagesString = html.match(new RegExp(`підчерга\\s${subqueueNumber}\\s–\\s([\\s\\S]*?)(?=підчерга\\s\\d|$)`));
   if (outagesString && outagesString[1]) {
     timeStrings = [...outagesString[1].matchAll(/(\d{2}:\d{2})\sдо\s(\d{2}:\d{2})/g)]
         .map(m => `${m[1]} - ${m[2]}`);
