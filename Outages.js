@@ -13,7 +13,7 @@ const subqueueNumber = isInversed ? subqueueParam.slice(0, -1) : subqueueParam;
 // Auto-update configuration
 const scriptName = 'Outages';
 const rawUrl = `https://raw.githubusercontent.com/Lincer/outages-widget/main/${scriptName}.js`;
-const currentVersion = "1.2";
+const currentVersion = "1.3";
 
 // Check for updates
 async function checkForUpdates() {
@@ -44,29 +44,27 @@ async function checkForUpdates() {
 // Run update check
 await checkForUpdates();
 
-// Get outage time from the site
-const url = 'https://hoe.com.ua/page/pogodinni-vidkljuchennja'
-const cachePath = fm.joinPath(fm.documentsDirectory(), `outages_cache_${subqueueNumber}.json`);
+// Get outage times
+const apiURL = "https://outages-widget.netlify.app/.netlify/functions/getOutages";
+const cachePath = fm.joinPath(fm.documentsDirectory(), `outages_cache.json`);
 let timeStrings = [];
+let outagesDate = '';
 
 try {
-  const req = new Request(url)
-  const html = await req.loadString()
-  const outagesString = html.match(new RegExp(`підчерга\\s${subqueueNumber}\\s–\\s([\\s\\S]*?)(?=підчерга\\s\\d|$)`));
-  if (outagesString && outagesString[1]) {
-    timeStrings = [...outagesString[1].matchAll(/(\d{2}:\d{2})\sдо\s(\d{2}:\d{2})/g)]
-        .map(m => `${m[1]} - ${m[2]}`);
+  const request = new Request(apiURL)
+  const outagesData = await request.loadJSON()
 
-    // save to cache
-    fm.writeString(cachePath, JSON.stringify(timeStrings));
-  } else {
-    throw new Error("Could not parse outages from HTML");
-  }
+  // save to cache
+  fm.writeString(cachePath, JSON.stringify(outagesData));
+
+  outagesDate = outagesData.date;
+  timeStrings = outagesData.subqueues[subqueueNumber];
 } catch (e) {
   // if the update failed, take times from the cache
   if (fm.fileExists(cachePath)) {
     const cacheContent = fm.readString(cachePath);
-    timeStrings = JSON.parse(cacheContent);
+    outagesDate = cacheContent.date;
+    timeStrings = JSON.parse(cacheContent).subqueues[subqueueNumber];
   }
 }
 
@@ -118,7 +116,7 @@ img.tintColor = isInversed ? Color.green() : Color.red();
 headerRow.addSpacer(5);
 
 // header text
-const headerText = headerRow.addText(`Черга ${subqueueNumber}:`);
+const headerText = headerRow.addText(`${subqueueNumber} на ${outagesDate}:`);
 headerText.textColor = new Color("#e4e3df");
 headerText.font = Font.boldSystemFont(14);
 headerText.leftAlignText();
