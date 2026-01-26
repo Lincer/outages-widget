@@ -136,22 +136,22 @@ export default async (req, context) => {
             results[subqueue] = statesToSlots(states)
         }
 
-        return {
-            statusCode: 200,
+        const data = {
+            date: outagesDate,
+            subqueues: results
+        }
+
+        return new Response(JSON.stringify(data), {
+            status: 200,
             headers: {
                 "Content-Type": "application/json",
-                "Cache-Control": "no-store" // important for widgets
-            },
-            body: JSON.stringify({
-                date: outagesDate,
-                updatedAt: new Date().toISOString(),
-                subqueues: results
-            })
-        }
+                "Cache-Control": "no-store"
+            }
+        })
     } catch (error) {
-        return {
-            statusCode: 500,
-            body: JSON.stringify({ error: err.message })
-        }
+        return new Response(
+            JSON.stringify({ error: error.message }),
+            { status: 500 }
+        )
     }
 }
