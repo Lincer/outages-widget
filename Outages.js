@@ -13,7 +13,7 @@ const subqueueNumber = isInversed ? subqueueParam.slice(0, -1) : subqueueParam;
 // Auto-update configuration
 const scriptName = 'Outages';
 const rawUrl = `https://raw.githubusercontent.com/Lincer/outages-widget/main/${scriptName}.js`;
-const currentVersion = "1.3";
+const currentVersion = "1.3.1";
 
 // Check for updates
 async function checkForUpdates() {
@@ -62,9 +62,9 @@ try {
 } catch (e) {
   // if the update failed, take times from the cache
   if (fm.fileExists(cachePath)) {
-    const cacheContent = fm.readString(cachePath);
+    const cacheContent = JSON.parse(fm.readString(cachePath));
     outagesDate = cacheContent.date;
-    timeStrings = JSON.parse(cacheContent).subqueues[subqueueNumber];
+    timeStrings = cacheContent.subqueues[subqueueNumber];
   }
 }
 
