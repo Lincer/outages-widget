@@ -1,6 +1,5 @@
 import fetch from "node-fetch"
 import { createCanvas, loadImage } from "canvas"
-import fs from "fs"
 
 const PAGE_URL = "https://hoe.com.ua/page/pogodinni-vidkljuchennja"
 
@@ -52,7 +51,6 @@ function extractDateFromAlt(alt) {
     return `${m[1]}.${m[2]}`
 }
 
-// --------------------------------------
 function colorDistance(r1, g1, b1, r2, g2, b2) {
     return Math.sqrt(
         Math.pow(r1 - r2, 2) +
@@ -107,7 +105,7 @@ function statesToSlots(states) {
     return slots
 }
 
-export default async (req, context) => {
+export default async () => {
     try {
         const imageURL = await getScheduleImageUrl();
         // Download image
