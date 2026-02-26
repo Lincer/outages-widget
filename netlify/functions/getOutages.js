@@ -77,6 +77,10 @@ function classifyPixel(r, g, b) {
 }
 
 function statesToSlots(states) {
+    if (states.every(state => state === "on")) {
+        return ["Запланованих відключень немає"]
+    }
+
     const slots = []
     let start = null
 
