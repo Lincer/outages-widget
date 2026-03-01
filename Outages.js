@@ -13,7 +13,7 @@ const subqueueNumber = isInversed ? subqueueParam.slice(0, -1) : subqueueParam;
 // Auto-update configuration
 const scriptName = 'Outages';
 const rawUrl = `https://raw.githubusercontent.com/Lincer/outages-widget/main/${scriptName}.js`;
-const currentVersion = "1.3.1";
+const currentVersion = "1.4";
 
 // Check for updates
 async function checkForUpdates() {
@@ -116,22 +116,29 @@ img.tintColor = isInversed ? Color.green() : Color.red();
 headerRow.addSpacer(5);
 
 // header text
-const headerText = headerRow.addText(`${subqueueNumber} на ${outagesDate}:`);
+const headerText = headerRow.addText(`${subqueueNumber} на ${outagesDate}`);
 headerText.textColor = new Color("#e4e3df");
 headerText.font = Font.boldSystemFont(14);
 headerText.leftAlignText();
 
 widget.addSpacer(10);
 
-// add all time slots
-timeStrings.forEach(time => {
-  const nameText = widget.addText(time);
+if (timeStrings.length < 1) {
+  const nameText = widget.addText("Заплановані відключення відсутні");
   nameText.textColor = new Color("#e4e3df");
   nameText.font = Font.regularSystemFont(16);
-  nameText.leftAlignText();
+  nameText.centerAlignText();
+} else {
+  // add all time slots
+  timeStrings.forEach(time => {
+    const nameText = widget.addText(time);
+    nameText.textColor = new Color("#e4e3df");
+    nameText.font = Font.regularSystemFont(16);
+    nameText.leftAlignText();
 
-  widget.addSpacer(10);
-})
+    widget.addSpacer(10);
+  })
+}
 
 Script.setWidget(widget);
 widget.presentSmall();
