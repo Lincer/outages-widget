@@ -3,9 +3,6 @@ import { createCanvas, loadImage } from "canvas"
 
 const PAGE_URL = "https://hoe.com.ua/page/pogodinni-vidkljuchennja"
 
-let outagesDate = '';
-let results = {};
-
 // image grid config
 const gridConfig = {
     left: 160,
@@ -23,7 +20,7 @@ const gridConfig = {
     ]
 }
 
-async function getScheduleImageUrl() {
+async function getScheduleImageData() {
     const res = await fetch(PAGE_URL)
     const html = await res.text()
 
@@ -33,15 +30,19 @@ async function getScheduleImageUrl() {
     )
 
     if (!imgMatch) {
-        throw new Error("Schedule image was not found")
+        // if no image found, serve the current date
+        const currentDate = new Intl.DateTimeFormat('en-GB', {
+            day: '2-digit',
+            month: '2-digit'
+        }).format(new Date());
+
+        return { imageUrl: null, date: currentDate }
+    } else {
+        const alt = imgMatch[1]
+        let src = imgMatch[2]
+
+        return { imageURL: `https://hoe.com.ua${src}`, date: extractDateFromAlt(alt) }
     }
-
-    const alt = imgMatch[1]
-    let src = imgMatch[2]
-
-    outagesDate = extractDateFromAlt(alt)
-
-    return `https://hoe.com.ua${src}`
 }
 
 function extractDateFromAlt(alt) {
@@ -49,6 +50,16 @@ function extractDateFromAlt(alt) {
     if (!m) return null
 
     return `${m[1]}.${m[2]}`
+}
+
+function noOutagesResults() {
+    const subqueues = {}
+
+    for (const subqueue of gridConfig.subqueues) {
+        subqueues[subqueue] = []
+    }
+
+    return subqueues
 }
 
 function colorDistance(r1, g1, b1, r2, g2, b2) {
@@ -76,7 +87,7 @@ function classifyPixel(r, g, b) {
 
 function statesToSlots(states) {
     if (states.every(state => state === "on")) {
-        return ["Запланованих відключень немає"]
+        return []
     }
 
     const slots = []
@@ -95,7 +106,7 @@ function statesToSlots(states) {
         }
     }
 
-    // outage until end of day
+    // outage until the end of the day
     if (start !== null) {
         slots.push(
             `${String(start).padStart(2, "0")}:00 - 24:00`
@@ -106,8 +117,27 @@ function statesToSlots(states) {
 }
 
 export default async () => {
+    const results = {}
+
     try {
-        const imageURL = await getScheduleImageUrl();
+        const {imageURL, date} = await getScheduleImageData();
+
+        // no image was found on the page, serve current date and empty results
+        if (!imageURL) {
+            const data = {
+                date,
+                subqueues: noOutagesResults()
+            }
+
+            return new Response(JSON.stringify(data), {
+                status: 200,
+                headers: {
+                    "Content-Type": "application/json",
+                    "Cache-Control": "no-store"
+                }
+            })
+        }
+
         // Download image
         const res = await fetch(imageURL)
         const buffer = Buffer.from(await res.arrayBuffer())
@@ -139,7 +169,7 @@ export default async () => {
         }
 
         const data = {
-            date: outagesDate,
+            date,
             subqueues: results
         }
 
