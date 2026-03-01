@@ -24,32 +24,53 @@ async function getScheduleImageData() {
     const res = await fetch(PAGE_URL)
     const html = await res.text()
 
+    const currentDate = getCurrentDateString(todayUtc());
+
     // find first <img> with alt containing "ГПВ"
     const imgMatch = html.match(
         /<img[^>]+alt=["']([^"']*ГПВ[^"']*)["'][^>]+src=["']([^"']+)["']/i
     )
 
+    // if no image found, serve the current date
     if (!imgMatch) {
-        // if no image found, serve the current date
-        const currentDate = new Intl.DateTimeFormat('en-GB', {
-            day: '2-digit',
-            month: '2-digit'
-        }).format(new Date());
-
         return { imageUrl: null, date: currentDate }
-    } else {
-        const alt = imgMatch[1]
-        let src = imgMatch[2]
-
-        return { imageURL: `https://hoe.com.ua${src}`, date: extractDateFromAlt(alt) }
     }
+
+    const alt = imgMatch[1]
+    const src = imgMatch[2]
+    const parsedAltDate = parseAltDate(alt)
+
+    // if the alt date is missing or in the past, fall back to the current date and skip the image
+    if (!parsedAltDate || parsedAltDate.date < todayUtc()) {
+        return { imageUrl: null, date: currentDate }
+    }
+
+    return { imageURL: `https://hoe.com.ua${src}`, date: parsedAltDate.display }
 }
 
-function extractDateFromAlt(alt) {
-    const m = alt.match(/(\d{2})\.(\d{2})\.\d{2}/)
+function todayUtc() {
+    const now = new Date()
+    return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()))
+}
+
+function getCurrentDateString(date) {
+    const day = String(date.getUTCDate()).padStart(2, "0")
+    const month = String(date.getUTCMonth() + 1).padStart(2, "0")
+    return `${day}.${month}`
+}
+
+function parseAltDate(alt) {
+    const m = alt.match(/(\d{2})\.(\d{2})/)
     if (!m) return null
 
-    return `${m[1]}.${m[2]}`
+    const day = Number(m[1])
+    const month = Number(m[2]) - 1 // zero-based month
+    const year = todayUtc().getUTCFullYear()
+
+    const date = new Date(Date.UTC(year, month, day))
+    if (Number.isNaN(date.getTime())) return null
+
+    return { display: `${m[1]}.${m[2]}`, date }
 }
 
 function noOutagesResults() {
