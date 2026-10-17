@@ -60,12 +60,12 @@ function getCurrentDateString(date) {
 }
 
 function parseAltDate(alt) {
-    const m = alt.match(/(\d{2})\.(\d{2})/)
+    const m = alt.match(/ГПВ\s+(\d{2})(\d{2})(\d{4})/)
     if (!m) return null
 
     const day = Number(m[1])
     const month = Number(m[2]) - 1 // zero-based month
-    const year = todayUtc().getUTCFullYear()
+    const year = Number(m[3])
 
     const date = new Date(Date.UTC(year, month, day))
     if (Number.isNaN(date.getTime())) return null
