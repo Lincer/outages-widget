@@ -13,12 +13,13 @@ const subqueueNumber = isInversed ? subqueueParam.slice(0, -1) : subqueueParam;
 // Auto-update configuration
 const scriptName = 'Outages';
 const rawUrl = `https://raw.githubusercontent.com/Lincer/outages-widget/main/${scriptName}.js`;
-const currentVersion = "1.4";
+const currentVersion = "1.5";
 
 // Check for updates
 async function checkForUpdates() {
   try {
     const req = new Request(rawUrl);
+    req.timeoutInterval = 5;
     const updatedCode = await req.loadString();
 
     // Simple version check: look for currentVersion in the remote file
@@ -49,6 +50,7 @@ const apiURL = "https://outages-widget.netlify.app/.netlify/functions/getOutages
 const cachePath = fm.joinPath(fm.documentsDirectory(), `outages_cache.json`);
 let timeStrings = [];
 let outagesDate = '';
+let hasOutageData = false;
 
 function isValidOutagesData(data) {
   if (
@@ -69,7 +71,8 @@ function isValidOutagesData(data) {
 }
 
 try {
-  const request = new Request(apiURL)
+  const request = new Request(apiURL);
+  request.timeoutInterval = 15;
   const outagesData = await request.loadJSON()
 
   // cache only validated responses
@@ -80,6 +83,7 @@ try {
 
   outagesDate = outagesData.date;
   timeStrings = outagesData.subqueues[subqueueNumber];
+  hasOutageData = true;
 } catch (e) {
   // if the update failed, take times from the cache
   try {
@@ -87,6 +91,7 @@ try {
       const cacheContent = JSON.parse(fm.readString(cachePath));
       outagesDate = cacheContent.date;
       timeStrings = cacheContent.subqueues[subqueueNumber];
+      hasOutageData = true;
     }
   } catch (cacheError) {
     console.log('Outage cache unavailable: ' + cacheError.message);
@@ -141,19 +146,31 @@ img.tintColor = isInversed ? Color.green() : Color.red();
 headerRow.addSpacer(5);
 
 // header text
-const headerText = headerRow.addText(`${subqueueNumber} на ${outagesDate}`);
+const headerText = headerRow.addText(
+  outagesDate ? `${subqueueNumber} на ${outagesDate}` : subqueueNumber
+);
 headerText.textColor = new Color("#e4e3df");
 headerText.font = Font.boldSystemFont(14);
 headerText.leftAlignText();
 
 widget.addSpacer(10);
 
-if (timeStrings.length < 1) {
+// wasn't able to fetch data, and cache expired/non-existant
+if (!hasOutageData) {
+  const errorText = widget.addText("Не вдалося оновити дані");
+  errorText.textColor = new Color("#ffe0b2");
+  errorText.font = Font.boldSystemFont(15);
+  errorText.centerAlignText();
+}
+// no planned outages
+else if (timeStrings.length < 1) {
   const nameText = widget.addText("Заплановані відключення відсутні");
   nameText.textColor = new Color("#e4e3df");
   nameText.font = Font.regularSystemFont(16);
   nameText.centerAlignText();
-} else {
+}
+// have the planned outages
+else {
   // add all time slots
   timeStrings.forEach(time => {
     const nameText = widget.addText(time);
