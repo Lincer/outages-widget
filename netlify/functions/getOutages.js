@@ -5,10 +5,10 @@ const PAGE_URL = "https://hoe.com.ua/page/pogodinni-vidkljuchennja"
 
 // image grid config
 const gridConfig = {
-    left: 160,
-    top: 312,
-    cellWidth: 58,
-    cellHeight: 53,
+    left: 207,
+    top: 255,
+    cellWidth: 57.3,
+    cellHeight: 44,
     hours: 24,
     subqueues: [
         "1.1","1.2",
