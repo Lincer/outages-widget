@@ -50,21 +50,46 @@ const cachePath = fm.joinPath(fm.documentsDirectory(), `outages_cache.json`);
 let timeStrings = [];
 let outagesDate = '';
 
+function isValidOutagesData(data) {
+  if (
+    !data ||
+    typeof data !== 'object' ||
+    Array.isArray(data) ||
+    typeof data.date !== 'string' ||
+    !data.date ||
+    !data.subqueues ||
+    typeof data.subqueues !== 'object' ||
+    Array.isArray(data.subqueues)
+  ) {
+    return false;
+  }
+
+  const queueTimes = data.subqueues[subqueueNumber];
+  return Array.isArray(queueTimes) && queueTimes.every(time => typeof time === 'string');
+}
+
 try {
   const request = new Request(apiURL)
   const outagesData = await request.loadJSON()
 
-  // save to cache
+  // cache only validated responses
+  if (!isValidOutagesData(outagesData)) {
+    throw new Error('API returned invalid outage data');
+  }
   fm.writeString(cachePath, JSON.stringify(outagesData));
 
   outagesDate = outagesData.date;
   timeStrings = outagesData.subqueues[subqueueNumber];
 } catch (e) {
   // if the update failed, take times from the cache
-  if (fm.fileExists(cachePath)) {
-    const cacheContent = JSON.parse(fm.readString(cachePath));
-    outagesDate = cacheContent.date;
-    timeStrings = cacheContent.subqueues[subqueueNumber];
+  try {
+    if (fm.fileExists(cachePath)) {
+      const cacheContent = JSON.parse(fm.readString(cachePath));
+      outagesDate = cacheContent.date;
+      timeStrings = cacheContent.subqueues[subqueueNumber];
+    }
+  } catch (cacheError) {
+    console.log('Outage cache unavailable: ' + cacheError.message);
   }
 }
 
