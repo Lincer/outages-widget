@@ -65,7 +65,7 @@ function parseAltDate(alt) {
 
     const day = Number(m[1])
     const month = Number(m[2]) - 1 // zero-based month
-    const year = Number(m[3])
+    const year = todayUtc().getUTCFullYear()
 
     const date = new Date(Date.UTC(year, month, day))
     if (Number.isNaN(date.getTime())) return null
