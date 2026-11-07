@@ -20,11 +20,16 @@ const gridConfig = {
     ]
 }
 
-async function getScheduleImageData() {
+async function getScheduleData() {
     const res = await fetch(PAGE_URL)
     const html = await res.text()
 
     const currentDate = getCurrentDateString(todayUtc());
+
+    const textSchedule = parseTextSchedule(html)
+    if (textSchedule) {
+        return { textSchedule }
+    }
 
     // find first <img> with alt containing "ГПВ"
     const imgMatch = html.match(
@@ -46,6 +51,77 @@ async function getScheduleImageData() {
     }
 
     return { imageURL: `https://hoe.com.ua${src}`, date: parsedAltDate.display }
+}
+
+const ukrainianMonths = {
+    "січня": 1, "лютого": 2, "березня": 3, "квітня": 4,
+    "травня": 5, "червня": 6, "липня": 7, "серпня": 8,
+    "вересня": 9, "жовтня": 10, "листопада": 11, "грудня": 12
+}
+
+function parseTextSchedule(html) {
+    // Parse visible HTML text so tags around subqueue entries do not affect matching.
+    const text = html
+        .replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, " ")
+        .replace(/<style\b[^>]*>[\s\S]*?<\/style>/gi, " ")
+        .replace(/<br\s*\/?>/gi, "\n")
+        .replace(/<\/p\s*>/gi, "\n")
+        .replace(/<[^>]+>/g, " ")
+        .replace(/&nbsp;|&#160;|&#xA0;/gi, " ")
+        .replace(/&ndash;|&#8211;|&#x2013;/gi, "–")
+        .replace(/&mdash;|&#8212;|&#x2014;/gi, "—")
+        .replace(/&amp;/gi, "&")
+        .replace(/[\t\r ]+/g, " ");
+
+    const dateMatch = text.match(/(?:^|\s)(\d{1,2})\s+(січня|лютого|березня|квітня|травня|червня|липня|серпня|вересня|жовтня|листопада|грудня)(?=\s|[,.:;!?)]|$)/i)
+    if (!dateMatch) return null
+
+    const day = Number(dateMatch[1])
+    const month = ukrainianMonths[dateMatch[2].toLowerCase()]
+    const date = dateForDayMonth(day, month)
+    if (!date || date < todayUtc()) return null
+
+    const results = noOutagesResults()
+    const matchedQueues = new Set()
+    for (const line of text.split("\n")) {
+        const match = line.match(/Підчерга\s+(\d+\.\d+)\s*[–—-]\s*(.*)/i)
+        if (!match) continue
+        const subqueue = match[1]
+        if (!Object.prototype.hasOwnProperty.call(results, subqueue)) continue
+        if (matchedQueues.has(subqueue)) return null
+
+        const windowPattern = /\b([01]?\d|2[0-4]):([0-5]\d)\s*[-–—]\s*([01]?\d|2[0-4]):([0-5]\d)\b/g
+        const windows = []
+        let windowMatch
+        while ((windowMatch = windowPattern.exec(match[2])) !== null) {
+            const startHour = Number(windowMatch[1])
+            const startMinute = Number(windowMatch[2])
+            const endHour = Number(windowMatch[3])
+            const endMinute = Number(windowMatch[4])
+            if (startHour > 23 || endHour > 24 || (endHour === 24 && endMinute !== 0)) continue
+            const start = startHour * 60 + startMinute
+            const end = endHour * 60 + endMinute
+            if (end <= start) continue
+            windows.push(`${String(startHour).padStart(2, "0")}:${String(startMinute).padStart(2, "0")} - ${String(endHour).padStart(2, "0")}:${String(endMinute).padStart(2, "0")}`)
+        }
+        results[subqueue] = windows
+        matchedQueues.add(subqueue)
+    }
+
+    // A partial/malformed text block must not replace a valid image schedule or empty fallback.
+    if (matchedQueues.size !== gridConfig.subqueues.length) return null
+    return { date: `${String(day).padStart(2, "0")}.${String(month).padStart(2, "0")}`, subqueues: results }
+}
+
+function dateForDayMonth(day, month) {
+    if (!Number.isInteger(day) || day < 1 || day > 31 || !month) return null
+    const today = todayUtc()
+    let year = today.getUTCFullYear()
+    let date = new Date(Date.UTC(year, month - 1, day))
+    if (date.getUTCDate() !== day || date.getUTCMonth() !== month - 1) return null
+    // The schedule is for the nearest occurrence of this day/month; handle year rollover.
+    if (date < today) date = new Date(Date.UTC(year + 1, month - 1, day))
+    return date
 }
 
 function todayUtc() {
@@ -141,7 +217,19 @@ export default async () => {
     const results = {}
 
     try {
-        const {imageURL, date} = await getScheduleImageData();
+        const schedule = await getScheduleData();
+
+        if (schedule.textSchedule) {
+            return new Response(JSON.stringify(schedule.textSchedule), {
+                status: 200,
+                headers: {
+                    "Content-Type": "application/json",
+                    "Cache-Control": "no-store"
+                }
+            })
+        }
+
+        const {imageURL, date} = schedule
 
         // no image was found on the page, serve current date and empty results
         if (!imageURL) {
