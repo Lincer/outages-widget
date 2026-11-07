@@ -60,8 +60,16 @@ const ukrainianMonths = {
 }
 
 function parseTextSchedule(html) {
+    // The page can contain older or repeated schedule sections after the latest post.
+    // Parse only the first post, which contains the current published schedule.
+    let scheduleHtml = html
+    const postStart = scheduleHtml.search(/<div\b[^>]*class=["'][^"']*\bpost\b[^"']*["'][^>]*>/i)
+    if (postStart !== -1) scheduleHtml = scheduleHtml.slice(postStart)
+    const sectionEnd = scheduleHtml.search(/<hr\b/i)
+    if (sectionEnd !== -1) scheduleHtml = scheduleHtml.slice(0, sectionEnd)
+
     // Parse visible HTML text so tags around subqueue entries do not affect matching.
-    const text = html
+    const text = scheduleHtml
         .replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, " ")
         .replace(/<style\b[^>]*>[\s\S]*?<\/style>/gi, " ")
         .replace(/<br\s*\/?>/gi, "\n")
