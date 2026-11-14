@@ -116,8 +116,10 @@ function parseTextSchedule(html) {
         matchedQueues.add(subqueue)
     }
 
-    // A partial/malformed text block must not replace a valid image schedule or empty fallback.
-    if (matchedQueues.size !== gridConfig.subqueues.length) return null
+    // The page lists only queues with planned outages. Omitted queues retain
+    // their empty arrays from noOutagesResults(). Require at least one entry
+    // so unrelated page text cannot be mistaken for a schedule.
+    if (matchedQueues.size === 0) return null
     return { date: `${String(day).padStart(2, "0")}.${String(month).padStart(2, "0")}`, subqueues: results }
 }
 
