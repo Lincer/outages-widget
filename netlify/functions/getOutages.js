@@ -87,7 +87,12 @@ function parseTextSchedule(html) {
     const day = Number(dateMatch[1])
     const month = ukrainianMonths[dateMatch[2].toLowerCase()]
     const date = dateForDayMonth(day, month)
-    if (!date || date < todayUtc()) return null
+    if (!date) return null
+    // A schedule dated before today is stale. Treat it as no schedule for
+    // today rather than inferring that it belongs to next year.
+    if (date < todayUtc()) {
+        return { date: getCurrentDateString(todayUtc()), subqueues: noOutagesResults() }
+    }
 
     const results = noOutagesResults()
     const matchedQueues = new Set()
@@ -129,8 +134,6 @@ function dateForDayMonth(day, month) {
     let year = today.getUTCFullYear()
     let date = new Date(Date.UTC(year, month - 1, day))
     if (date.getUTCDate() !== day || date.getUTCMonth() !== month - 1) return null
-    // The schedule is for the nearest occurrence of this day/month; handle year rollover.
-    if (date < today) date = new Date(Date.UTC(year + 1, month - 1, day))
     return date
 }
 
