@@ -83,13 +83,9 @@ function parseTextSchedule(html) {
         .replace(/&amp;/gi, "&")
         .replace(/[\t\r ]+/g, " ");
 
-    const dateMatch = text.match(/(?:^|\s)(\d{1,2})\s+(січня|лютого|березня|квітня|травня|червня|липня|серпня|вересня|жовтня|листопада|грудня)(?=\s|[,.:;!?)]|$)/i)
-    if (!dateMatch) return null
-
-    const day = Number(dateMatch[1])
-    const month = ukrainianMonths[dateMatch[2].toLowerCase()]
-    const date = dateForDayMonth(day, month)
-    if (!date) return null
+    const parsedDate = parseTextDate(text)
+    if (!parsedDate) return null
+    const { day, month, date } = parsedDate
 
     const results = noOutagesResults()
     const matchedQueues = new Set()
@@ -127,6 +123,26 @@ function parseTextSchedule(html) {
         scheduleDate: date,
         subqueues: results
     }
+}
+
+function parseTextDate(text) {
+    const numericDateMatch = text.match(/(?:^|\s)(\d{1,2})\.(\d{1,2})\.(\d{4})(?=\s|[,;!?)]|$)/)
+    if (numericDateMatch) {
+        const day = Number(numericDateMatch[1])
+        const month = Number(numericDateMatch[2])
+        const year = Number(numericDateMatch[3])
+        const date = new Date(Date.UTC(year, month - 1, day))
+        if (date.getUTCFullYear() !== year || date.getUTCMonth() !== month - 1 || date.getUTCDate() !== day) return null
+        return { day, month, date }
+    }
+
+    const monthNameDateMatch = text.match(/(?:^|\s)(\d{1,2})\s+(січня|лютого|березня|квітня|травня|червня|липня|серпня|вересня|жовтня|листопада|грудня)(?=\s|[,.:;!?)]|$)/i)
+    if (!monthNameDateMatch) return null
+
+    const day = Number(monthNameDateMatch[1])
+    const month = ukrainianMonths[monthNameDateMatch[2].toLowerCase()]
+    const date = dateForDayMonth(day, month)
+    return date ? { day, month, date } : null
 }
 
 function dateForDayMonth(day, month) {
