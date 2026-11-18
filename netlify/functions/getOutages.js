@@ -27,30 +27,32 @@ async function getScheduleData() {
     const currentDate = getCurrentDateString(todayUtc());
 
     const textSchedule = parseTextSchedule(html)
+    let scheduleDate
+    let imageURL
+
     if (textSchedule) {
-        return { textSchedule }
+        scheduleDate = textSchedule.scheduleDate
+        delete textSchedule.scheduleDate
+    } else {
+        // find first <img> with alt containing "ГПВ"
+        const imgMatch = html.match(
+            /<img[^>]+alt=["']([^"']*ГПВ[^"']*)["'][^>]+src=["']([^"']+)["']/i
+        )
+        if (imgMatch) {
+            const parsedAltDate = parseAltDate(imgMatch[1])
+            scheduleDate = parsedAltDate?.date
+            imageURL = `https://hoe.com.ua${imgMatch[2]}`
+        }
     }
 
-    // find first <img> with alt containing "ГПВ"
-    const imgMatch = html.match(
-        /<img[^>]+alt=["']([^"']*ГПВ[^"']*)["'][^>]+src=["']([^"']+)["']/i
-    )
-
-    // if no image found, serve the current date
-    if (!imgMatch) {
+    // Apply the same freshness check to text and image schedules.
+    if (!scheduleDate || scheduleDate < todayUtc()) {
         return { imageUrl: null, date: currentDate }
     }
 
-    const alt = imgMatch[1]
-    const src = imgMatch[2]
-    const parsedAltDate = parseAltDate(alt)
+    if (textSchedule) return { textSchedule }
 
-    // if the alt date is missing or in the past, fall back to the current date and skip the image
-    if (!parsedAltDate || parsedAltDate.date < todayUtc()) {
-        return { imageUrl: null, date: currentDate }
-    }
-
-    return { imageURL: `https://hoe.com.ua${src}`, date: parsedAltDate.display }
+    return { imageURL, date: getCurrentDateString(scheduleDate) }
 }
 
 const ukrainianMonths = {
@@ -88,11 +90,6 @@ function parseTextSchedule(html) {
     const month = ukrainianMonths[dateMatch[2].toLowerCase()]
     const date = dateForDayMonth(day, month)
     if (!date) return null
-    // A schedule dated before today is stale. Treat it as no schedule for
-    // today rather than inferring that it belongs to next year.
-    if (date < todayUtc()) {
-        return { date: getCurrentDateString(todayUtc()), subqueues: noOutagesResults() }
-    }
 
     const results = noOutagesResults()
     const matchedQueues = new Set()
@@ -125,7 +122,11 @@ function parseTextSchedule(html) {
     // their empty arrays from noOutagesResults(). Require at least one entry
     // so unrelated page text cannot be mistaken for a schedule.
     if (matchedQueues.size === 0) return null
-    return { date: `${String(day).padStart(2, "0")}.${String(month).padStart(2, "0")}`, subqueues: results }
+    return {
+        date: `${String(day).padStart(2, "0")}.${String(month).padStart(2, "0")}`,
+        scheduleDate: date,
+        subqueues: results
+    }
 }
 
 function dateForDayMonth(day, month) {
