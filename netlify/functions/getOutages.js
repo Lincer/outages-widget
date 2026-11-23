@@ -24,9 +24,10 @@ async function getScheduleData() {
     const res = await fetch(PAGE_URL)
     const html = await res.text()
 
-    const currentDate = getCurrentDateString(todayUtc());
+    const today = getKyivDateString();
+    const currentDate = getCurrentDateString(today);
 
-    const textSchedule = parseTextSchedule(html)
+    const textSchedule = parseTextSchedule(html, today)
     let scheduleDate
     let imageURL
 
@@ -46,7 +47,7 @@ async function getScheduleData() {
     }
 
     // Apply the same freshness check to text and image schedules.
-    if (!scheduleDate || scheduleDate < todayUtc()) {
+    if (!scheduleDate || scheduleDate < today) {
         return { imageUrl: null, date: currentDate }
     }
 
@@ -61,31 +62,32 @@ const ukrainianMonths = {
     "вересня": 9, "жовтня": 10, "листопада": 11, "грудня": 12
 }
 
-function parseTextSchedule(html) {
-    // The page can contain older or repeated schedule sections after the latest post.
-    // Parse only the first post, which contains the current published schedule.
+function parseTextSchedule(html, today = getKyivDateString()) {
+    // Keep each <hr>-separated schedule independent; updates for one date must
+    // not be combined with the date or queues from another schedule.
     let scheduleHtml = html
     const postStart = scheduleHtml.search(/<div\b[^>]*class=["'][^"']*\bpost\b[^"']*["'][^>]*>/i)
     if (postStart !== -1) scheduleHtml = scheduleHtml.slice(postStart)
-    const sectionEnd = scheduleHtml.search(/<hr\b/i)
-    if (sectionEnd !== -1) scheduleHtml = scheduleHtml.slice(0, sectionEnd)
 
-    // Parse visible HTML text so tags around subqueue entries do not affect matching.
-    const text = scheduleHtml
-        .replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, " ")
-        .replace(/<style\b[^>]*>[\s\S]*?<\/style>/gi, " ")
-        .replace(/<br\s*\/?>/gi, "\n")
-        .replace(/<\/p\s*>/gi, "\n")
-        .replace(/<[^>]+>/g, " ")
-        .replace(/&nbsp;|&#160;|&#xA0;/gi, " ")
-        .replace(/&ndash;|&#8211;|&#x2013;/gi, "–")
-        .replace(/&mdash;|&#8212;|&#x2014;/gi, "—")
-        .replace(/&amp;/gi, "&")
-        .replace(/[\t\r ]+/g, " ");
+    const tomorrow = addDays(today, 1)
+    const candidates = []
+    for (const [sectionIndex, sectionHtml] of scheduleHtml.split(/<hr\b[^>]*>/i).entries()) {
+        const schedule = parseTextScheduleSection(sectionHtml)
+        if (!schedule) continue
+        if (schedule.scheduleDate === today) candidates.push({ schedule, sectionIndex, priority: 0 })
+        else if (schedule.scheduleDate === tomorrow) candidates.push({ schedule, sectionIndex, priority: 1 })
+    }
 
+    // The page lists newest sections first. Prefer today's newest schedule,
+    // falling back to tomorrow's newest schedule if today's is absent.
+    candidates.sort((a, b) => a.priority - b.priority || a.sectionIndex - b.sectionIndex)
+    return candidates[0]?.schedule || null
+}
+
+function parseTextScheduleSection(sectionHtml) {
+    const text = htmlToVisibleText(sectionHtml)
     const parsedDate = parseTextDate(text)
     if (!parsedDate) return null
-    const { day, month, date } = parsedDate
 
     const results = noOutagesResults()
     const matchedQueues = new Set()
@@ -114,15 +116,27 @@ function parseTextSchedule(html) {
         matchedQueues.add(subqueue)
     }
 
-    // The page lists only queues with planned outages. Omitted queues retain
-    // their empty arrays from noOutagesResults(). Require at least one entry
-    // so unrelated page text cannot be mistaken for a schedule.
+    // Require queue entries so unrelated page text is not treated as a schedule.
     if (matchedQueues.size === 0) return null
     return {
-        date: `${String(day).padStart(2, "0")}.${String(month).padStart(2, "0")}`,
-        scheduleDate: date,
+        date: getCurrentDateString(parsedDate.date),
+        scheduleDate: parsedDate.date,
         subqueues: results
     }
+}
+
+function htmlToVisibleText(html) {
+    return html
+        .replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, " ")
+        .replace(/<style\b[^>]*>[\s\S]*?<\/style>/gi, " ")
+        .replace(/<br\s*\/?\s*>/gi, "\n")
+        .replace(/<\/p\s*>/gi, "\n")
+        .replace(/<[^>]+>/g, " ")
+        .replace(/&nbsp;|&#160;|&#xA0;/gi, " ")
+        .replace(/&ndash;|&#8211;|&#x2013;/gi, "–")
+        .replace(/&mdash;|&#8212;|&#x2014;/gi, "—")
+        .replace(/&amp;/gi, "&")
+        .replace(/[\t\r ]+/g, " ")
 }
 
 function parseTextDate(text) {
@@ -133,7 +147,7 @@ function parseTextDate(text) {
         const year = Number(numericDateMatch[3])
         const date = new Date(Date.UTC(year, month - 1, day))
         if (date.getUTCFullYear() !== year || date.getUTCMonth() !== month - 1 || date.getUTCDate() !== day) return null
-        return { day, month, date }
+        return { date: date.toISOString().slice(0, 10) }
     }
 
     const monthNameDateMatch = text.match(/(?:^|\s)(\d{1,2})\s+(січня|лютого|березня|квітня|травня|червня|липня|серпня|вересня|жовтня|листопада|грудня)(?=\s|[,.:;!?)]|$)/i)
@@ -142,26 +156,40 @@ function parseTextDate(text) {
     const day = Number(monthNameDateMatch[1])
     const month = ukrainianMonths[monthNameDateMatch[2].toLowerCase()]
     const date = dateForDayMonth(day, month)
-    return date ? { day, month, date } : null
+    return date ? { date } : null
 }
 
 function dateForDayMonth(day, month) {
     if (!Number.isInteger(day) || day < 1 || day > 31 || !month) return null
-    const today = todayUtc()
-    let year = today.getUTCFullYear()
-    let date = new Date(Date.UTC(year, month - 1, day))
-    if (date.getUTCDate() !== day || date.getUTCMonth() !== month - 1) return null
-    return date
+    const today = getKyivDateString()
+    const currentYear = Number(today.slice(0, 4))
+    const todayUtc = Date.parse(`${today}T00:00:00Z`)
+    const candidates = [currentYear - 1, currentYear, currentYear + 1]
+        .map(year => new Date(Date.UTC(year, month - 1, day)))
+        .filter(date => date.getUTCDate() === day && date.getUTCMonth() === month - 1)
+    candidates.sort((a, b) => Math.abs(a.getTime() - todayUtc) - Math.abs(b.getTime() - todayUtc))
+    return candidates[0]?.toISOString().slice(0, 10) || null
 }
 
-function todayUtc() {
-    const now = new Date()
-    return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()))
+function getKyivDateString(now = new Date()) {
+    const parts = new Intl.DateTimeFormat("en-CA", {
+        timeZone: "Europe/Kyiv",
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit"
+    }).formatToParts(now)
+    const part = type => parts.find(item => item.type === type).value
+    return `${part("year")}-${part("month")}-${part("day")}`
 }
 
-function getCurrentDateString(date) {
-    const day = String(date.getUTCDate()).padStart(2, "0")
-    const month = String(date.getUTCMonth() + 1).padStart(2, "0")
+function addDays(dateString, days) {
+    const date = new Date(`${dateString}T00:00:00Z`)
+    date.setUTCDate(date.getUTCDate() + days)
+    return date.toISOString().slice(0, 10)
+}
+
+function getCurrentDateString(dateString) {
+    const [, , month, day] = dateString.match(/^(\d{4})-(\d{2})-(\d{2})$/)
     return `${day}.${month}`
 }
 
@@ -170,13 +198,12 @@ function parseAltDate(alt) {
     if (!m) return null
 
     const day = Number(m[1])
-    const month = Number(m[2]) - 1 // zero-based month
-    const year = todayUtc().getUTCFullYear()
+    const month = Number(m[2])
+    const year = Number(m[3])
+    const date = new Date(Date.UTC(year, month - 1, day))
+    if (date.getUTCFullYear() !== year || date.getUTCMonth() !== month - 1 || date.getUTCDate() !== day) return null
 
-    const date = new Date(Date.UTC(year, month, day))
-    if (Number.isNaN(date.getTime())) return null
-
-    return { display: `${m[1]}.${m[2]}`, date }
+    return { display: `${m[1]}.${m[2]}`, date: date.toISOString().slice(0, 10) }
 }
 
 function noOutagesResults() {
