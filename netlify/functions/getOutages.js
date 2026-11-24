@@ -137,8 +137,9 @@ function parseTextScheduleSection(sectionHtml) {
             if (startHour > 23 || endHour > 24 || (endHour === 24 && endMinute !== 0)) continue
             const start = startHour * 60 + startMinute
             const end = endHour * 60 + endMinute
-            if (end <= start) continue
-            windows.push(`${String(startHour).padStart(2, "0")}:${String(startMinute).padStart(2, "0")} - ${String(endHour).padStart(2, "0")}:${String(endMinute).padStart(2, "0")}`)
+            if (end <= start && !(endHour === 0 && endMinute === 0)) continue
+            const normalizedEndHour = endHour === 0 && endMinute === 0 ? 24 : endHour
+            windows.push(`${String(startHour).padStart(2, "0")}:${String(startMinute).padStart(2, "0")} - ${String(normalizedEndHour).padStart(2, "0")}:${String(endMinute).padStart(2, "0")}`)
         }
         results[subqueue] = windows
         matchedQueues.add(subqueue)
@@ -169,23 +170,29 @@ function htmlToVisibleText(html) {
 }
 
 function parseTextDate(text) {
-    const numericDateMatch = text.match(/(?:^|\s)(\d{1,2})\.(\d{1,2})\.(\d{4})(?=\s|[,;!?)]|$)/)
-    if (numericDateMatch) {
-        const day = Number(numericDateMatch[1])
-        const month = Number(numericDateMatch[2])
-        const year = Number(numericDateMatch[3])
-        const date = new Date(Date.UTC(year, month - 1, day))
-        if (date.getUTCFullYear() !== year || date.getUTCMonth() !== month - 1 || date.getUTCDate() !== day) return null
-        return { date: date.toISOString().slice(0, 10) }
+    // Prefer the schedule's written date (for example, "24 листопада") over
+    // a later date in its update note, which can refer to the previous day.
+    const monthNameDateMatch = text.match(/(?:^|\s)(\d{1,2})\s+(січня|лютого|березня|квітня|травня|червня|липня|серпня|вересня|жовтня|листопада|грудня)(?=\s|[,.:;!?)]|$)/i)
+    if (monthNameDateMatch) {
+        const day = Number(monthNameDateMatch[1])
+        const month = ukrainianMonths[monthNameDateMatch[2].toLowerCase()]
+        const date = dateForDayMonth(day, month)
+        return date ? { date } : null
     }
 
-    const monthNameDateMatch = text.match(/(?:^|\s)(\d{1,2})\s+(січня|лютого|березня|квітня|травня|червня|липня|серпня|вересня|жовтня|листопада|грудня)(?=\s|[,.:;!?)]|$)/i)
-    if (!monthNameDateMatch) return null
+    const numericDateMatch = text.match(/(?:^|\s)(\d{1,2})\.(\d{1,2})(?:\.(\d{4}))?(?=\s|[,;!?)]|$)/)
+    if (!numericDateMatch) return null
+    const day = Number(numericDateMatch[1])
+    const month = Number(numericDateMatch[2])
+    if (!numericDateMatch[3]) {
+        const date = dateForDayMonth(day, month)
+        return date ? { date } : null
+    }
 
-    const day = Number(monthNameDateMatch[1])
-    const month = ukrainianMonths[monthNameDateMatch[2].toLowerCase()]
-    const date = dateForDayMonth(day, month)
-    return date ? { date } : null
+    const year = Number(numericDateMatch[3])
+    const date = new Date(Date.UTC(year, month - 1, day))
+    if (date.getUTCFullYear() !== year || date.getUTCMonth() !== month - 1 || date.getUTCDate() !== day) return null
+    return { date: date.toISOString().slice(0, 10) }
 }
 
 function dateForDayMonth(day, month) {
