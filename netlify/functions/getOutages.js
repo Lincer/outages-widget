@@ -78,10 +78,38 @@ function parseTextSchedule(html, today = getKyivDateString()) {
         else if (schedule.scheduleDate === tomorrow) candidates.push({ schedule, sectionIndex, priority: 1 })
     }
 
-    // The page lists newest sections first. Prefer today's newest schedule,
-    // falling back to tomorrow's newest schedule if today's is absent.
+    // The page lists newest sections first. Prefer today's newest regular
+    // schedule, falling back to tomorrow's if today's is absent. Extra
+    // sections for that same date add their queue slots to the regular one.
     candidates.sort((a, b) => a.priority - b.priority || a.sectionIndex - b.sectionIndex)
-    return candidates[0]?.schedule || null
+    const priority = candidates[0]?.priority
+    if (priority === undefined) return null
+
+    const datedCandidates = candidates.filter(candidate => candidate.priority === priority)
+    const base = datedCandidates.find(candidate => !candidate.schedule.isAdditional)
+    if (!base) return datedCandidates[0].schedule
+
+    const additions = datedCandidates.filter(candidate => candidate.schedule.isAdditional)
+    if (additions.length > 0) {
+        for (const subqueue of gridConfig.subqueues) {
+            const combined = [
+                ...base.schedule.subqueues[subqueue],
+                ...additions.flatMap(candidate => candidate.schedule.subqueues[subqueue])
+            ]
+            base.schedule.subqueues[subqueue] = [...new Set(combined)].sort(compareTimeSlots)
+        }
+    }
+
+    delete base.schedule.isAdditional
+    return base.schedule
+}
+
+function compareTimeSlots(a, b) {
+    const startMinute = slot => {
+        const match = slot.match(/^(\d{2}):(\d{2})/)
+        return match ? Number(match[1]) * 60 + Number(match[2]) : Number.MAX_SAFE_INTEGER
+    }
+    return startMinute(a) - startMinute(b)
 }
 
 function parseTextScheduleSection(sectionHtml) {
@@ -121,6 +149,7 @@ function parseTextScheduleSection(sectionHtml) {
     return {
         date: getCurrentDateString(parsedDate.date),
         scheduleDate: parsedDate.date,
+        isAdditional: /додаткові/i.test(text),
         subqueues: results
     }
 }
